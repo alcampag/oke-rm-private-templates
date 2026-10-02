@@ -4,12 +4,13 @@ Install the published [OKE RM networking and cluster configurations](https://git
 as reusable private templates in your OCI tenancy. This installer creates templates only:
 it does not create stacks, clusters, network resources, or IAM policies.
 
-[![Open in Code Editor](https://raw.githubusercontent.com/oracle-devrel/oci-code-editor-samples/main/images/open-in-code-editor.png)](https://cloud.oracle.com/?region=home&cs_repo_url=https%3A%2F%2Fgithub.com%2Falcampag%2Foke-rm-private-templates.git&cs_branch=main&cs_initscript_path=install-private-templates.sh&cs_readme_path=README.md&cs_open_ce=true)
+[Install private templates in OCI Cloud Shell](https://cloud.oracle.com/?region=home&cs_repo_url=https%3A%2F%2Fgithub.com%2Falcampag%2Foke-rm-private-templates.git&cs_branch=main&cs_initscript_path=install-private-templates.sh&cs_readme_path=README.md&cs_open_ce=false)
 
 ## Quick Start
 
 1. Open the button above and review the repository before authorizing cloning.
-2. If automatic execution does not start, open Cloud Shell in the cloned repository and run:
+2. The link keeps Code Editor closed (`cs_open_ce=false`). If automatic execution
+   does not start, run this command in Cloud Shell from the cloned repository:
 
    ```bash
    bash install-private-templates.sh
@@ -18,7 +19,9 @@ it does not create stacks, clusters, network resources, or IAM policies.
 3. Review the summary and type `yes` to create the templates.
 4. In Resource Manager, create a stack and select a private template from the chosen compartment.
 
-Oracle can disable automatic script execution for untrusted repositories.
+Oracle disables automatic script execution for untrusted GitHub repositories,
+even when `cs_initscript_path` is supplied. Setting `cs_open_ce=false` changes
+the interface opened, not this execution restriction.
 The manual command is the supported fallback; see the
 [Cloud Shell button documentation](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/code_editor_using_using_git_from_code_editor_one_click_clone.htm).
 
