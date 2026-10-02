@@ -2,6 +2,7 @@
 """Install published OKE RM configurations as private Resource Manager templates."""
 
 import argparse
+import base64
 import configparser
 import json
 import os
@@ -100,6 +101,24 @@ def archive_url(release, filename):
     return url
 
 
+def create_template(archive, compartment, region, name, kind, version, release_url):
+    # Unlike stack upload commands, template creation expects base64 ZIP contents.
+    # Pass a JSON file to avoid command-line length limits for larger archives.
+    payload = {
+        "compartmentId": compartment,
+        "configSource": base64.b64encode(archive.read_bytes()).decode("ascii"),
+        "displayName": name,
+        "description": f"OKE RM {kind} template, release {version}.",
+        "longDescription": f"Installed from {release_url}. Creates no infrastructure until a stack is applied.",
+        "freeformTags": {"installer": INSTALLER, "asset": "oke-rm", "template_type": kind,
+                        "release_version": version},
+    }
+    request_file = archive.with_suffix(".request.json")
+    request_file.write_text(json.dumps(payload), encoding="utf-8")
+    return oci("resource-manager", "template", "create", "--region", region,
+               "--from-json", f"file://{request_file}", "--wait-for-state", "ACTIVE")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Validate and download archives without creating templates")
@@ -159,14 +178,8 @@ def main():
             if existing[kind]:
                 print(f"Skipped {names[kind]}: {existing[kind]['id']}")
                 continue
-            tags = {"installer": INSTALLER, "asset": "oke-rm", "template_type": kind,
-                    "release_version": version}
-            result = oci("resource-manager", "template", "create", "--region", region,
-                         "--compartment-id", compartment, "--config-source", str(archives[kind]),
-                         "--display-name", names[kind], "--description",
-                         f"OKE RM {kind} template, release {version}.", "--long-description",
-                         f"Installed from {release['html_url']}. Creates no infrastructure until a stack is applied.",
-                         "--freeform-tags", json.dumps(tags), "--wait-for-state", "ACTIVE")
+            result = create_template(archives[kind], compartment, region, names[kind],
+                                     kind, version, release["html_url"])
             print(f"Created {names[kind]}: {result['data']['id']}")
     print("Done. In Resource Manager, choose Create stack > Private template.")
 

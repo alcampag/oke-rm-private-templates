@@ -1,3 +1,7 @@
+import base64
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -61,6 +65,31 @@ class InstallerTests(unittest.TestCase):
         release = {"tag_name": "oke-rm-1.4.0", "assets": [{"name": "infra.zip", "browser_download_url": "https://example.com/infra.zip"}]}
         with self.assertRaises(ValueError):
             installer.archive_url(release, "infra.zip")
+
+    def test_create_passes_base64_contents_in_json_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "infra.zip"
+            content = b"PK\x03\x04binary-zip-content\x00\xff"
+            archive.write_bytes(content)
+
+            def check_request(*args):
+                self.assertEqual(args[:3], ("resource-manager", "template", "create"))
+                self.assertNotIn("--config-source", args)
+                self.assertEqual(args[args.index("--region") + 1], "eu-frankfurt-1")
+                path = args[args.index("--from-json") + 1].removeprefix("file://")
+                payload = json.loads(Path(path).read_text())
+                self.assertEqual(base64.b64decode(payload["configSource"], validate=True), content)
+                self.assertEqual(payload["compartmentId"], "ocid1.tenancy.oc1..test")
+                self.assertEqual(payload["displayName"], "oke-rm-networking")
+                self.assertEqual(payload["freeformTags"]["release_version"], "1.4.0")
+                self.assertIn("1.4.0", payload["description"])
+                return {"data": {"id": "template-created"}}
+
+            with patch.object(installer, "oci", side_effect=check_request):
+                result = installer.create_template(archive, "ocid1.tenancy.oc1..test",
+                                                   "eu-frankfurt-1", "oke-rm-networking",
+                                                   "networking", "1.4.0", "https://example.com/release")
+                self.assertEqual(result["data"]["id"], "template-created")
 
     def test_cancel_does_not_create_anything(self):
         release = {"tag_name": "oke-rm-1.4.0", "draft": False, "prerelease": False,
