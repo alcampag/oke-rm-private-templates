@@ -62,6 +62,16 @@ def oci(*args):
     return json.loads(result.stdout)
 
 
+def template_items(response):
+    data = response.get("data")
+    items = data.get("items") if isinstance(data, dict) else data
+    if not isinstance(items, list) or any(
+            not isinstance(item, dict) or not isinstance(item.get("display-name"), str)
+            for item in items):
+        raise ValueError("Unexpected OCI template list response: expected data.items containing template objects.")
+    return items
+
+
 def existing_template(templates, name, kind, version):
     matches = [t for t in templates if t["display-name"] == name
                and t.get("lifecycle-state") not in ("DELETED", "DELETING")]
@@ -118,8 +128,8 @@ def main():
     names = {k: prompt(f"{k.title()} template name", KINDS[k][1]) for k in kinds}
     if any(not n for n in names.values()) or len(set(names.values())) != len(names):
         raise ValueError("Template names must be nonempty and distinct.")
-    templates = oci("resource-manager", "template", "list", "--compartment-id", compartment,
-                    "--template-category-id", "3", "--all", "--region", region)["data"]
+    templates = template_items(oci("resource-manager", "template", "list", "--compartment-id", compartment,
+                                   "--template-category-id", "3", "--all", "--region", region))
     existing = {k: existing_template(templates, names[k], k, version) for k in kinds}
     urls = {k: archive_url(release, KINDS[k][0]) for k in kinds}
     print(f"\nRegion: {region}\nCompartment: {compartment}\nRelease: {tag}")

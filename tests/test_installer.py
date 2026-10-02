@@ -15,6 +15,22 @@ class InstallerTests(unittest.TestCase):
         template = self.template()
         self.assertEqual(installer.existing_template([template], "oke-rm-networking", "networking", "1.4.0"), template)
 
+    def test_oci_template_collection_is_unwrapped(self):
+        template = self.template()
+        items = installer.template_items({"data": {"items": [template]}})
+        self.assertEqual(installer.existing_template(items, "oke-rm-networking", "networking", "1.4.0"), template)
+
+    def test_empty_collection_is_supported(self):
+        self.assertEqual(installer.template_items({"data": {"items": []}}), [])
+
+    def test_legacy_list_is_supported(self):
+        self.assertEqual(installer.template_items({"data": [self.template()]}), [self.template()])
+
+    def test_malformed_collection_fails_closed(self):
+        for response in ({"data": {}}, {"data": {"items": ["not-a-template"]}}, {"data": None}):
+            with self.subTest(response=response), self.assertRaises(ValueError):
+                installer.template_items(response)
+
     def test_different_version_is_not_overwritten(self):
         with self.assertRaises(ValueError):
             installer.existing_template([self.template()], "oke-rm-networking", "networking", "1.5.0")
@@ -57,7 +73,7 @@ class InstallerTests(unittest.TestCase):
                 patch.object(installer, "prompt", side_effect=answers), \
                 patch.object(installer, "latest_release", return_value=release), \
                 patch.object(installer.shutil, "which", return_value="oci"), \
-                patch.object(installer, "oci", return_value={"data": []}) as cli:
+                patch.object(installer, "oci", return_value={"data": {"items": []}}) as cli:
             installer.main()
             self.assertEqual(cli.call_count, 1)
             self.assertEqual(cli.call_args.args[:3], ("resource-manager", "template", "list"))
